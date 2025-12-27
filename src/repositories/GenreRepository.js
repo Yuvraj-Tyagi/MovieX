@@ -15,11 +15,13 @@ class GenreRepository {
   }
 
   /**
-   * Find genre by name
+   * Find genre by name (case-insensitive)
    */
   async findByName(name) {
     try {
-      return await Genre.findOne({ name: { $regex: new RegExp(`^${name}$`, 'i') } });
+      return await Genre.findOne({
+        name: { $regex: new RegExp(`^${name}$`, 'i') }
+      });
     } catch (error) {
       logger.error('Error finding genre by name:', error);
       throw error;
@@ -27,19 +29,34 @@ class GenreRepository {
   }
 
   /**
-   * Find or create genre
+   * Find or create genre (slug-safe)
    */
   async findOrCreate(genreData) {
     try {
       const existing = await this.findByTmdbId(genreData.tmdbId);
-      
       if (existing) {
         return existing;
       }
 
-      const genre = new Genre(genreData);
-      await genre.save();
-      
+      const genre = await Genre.findOneAndUpdate(
+        { tmdbId: genreData.tmdbId },
+        {
+          $set: {
+            name: genreData.name,
+            slug: genreData.slug,
+            updatedAt: new Date()
+          },
+          $setOnInsert: {
+            tmdbId: genreData.tmdbId,
+            createdAt: new Date()
+          }
+        },
+        {
+          new: true,
+          upsert: true
+        }
+      );
+
       logger.debug(`Created new genre: ${genre.name}`);
       return genre;
     } catch (error) {
@@ -49,21 +66,34 @@ class GenreRepository {
   }
 
   /**
-   * Bulk upsert genres
+   * Bulk upsert genres (slug-safe, index-safe)
    */
   async bulkUpsert(genresData) {
     try {
-      const operations = genresData.map(genreData => ({
+      const operations = genresData.map(g => ({
         updateOne: {
-          filter: { tmdbId: genreData.tmdbId },
-          update: { $set: genreData },
+          filter: { tmdbId: g.tmdbId },
+          update: {
+            $set: {
+              name: g.name,
+              slug: g.slug,
+              updatedAt: new Date()
+            },
+            $setOnInsert: {
+              tmdbId: g.tmdbId,
+              createdAt: new Date()
+            }
+          },
           upsert: true
         }
       }));
 
-      const result = await Genre.bulkWrite(operations);
-      logger.debug(`Bulk upserted ${result.upsertedCount} genres, modified ${result.modifiedCount}`);
-      
+      const result = await Genre.bulkWrite(operations, { ordered: false });
+
+      logger.debug(
+        `Bulk upserted genres — inserted: ${result.upsertedCount}, modified: ${result.modifiedCount}`
+      );
+
       return result;
     } catch (error) {
       logger.error('Error in bulk upsert genres:', error);
