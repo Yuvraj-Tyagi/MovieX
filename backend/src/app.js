@@ -15,22 +15,18 @@ app.use((req, res, next) => {
   next();
 });
 
-// CORS (basic setup for development)
+// CORS (basic setup)
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  
-  if (req.method === 'OPTIONS') {
-    return res.sendStatus(200);
-  }
-  
+  if (req.method === 'OPTIONS') return res.sendStatus(200);
   next();
 });
 
-// Routes
-app.use('/api', movieRoutes);
-app.use('/api', healthRoutes);
+// Mount routers at correct paths
+app.use('/api', movieRoutes);   // movieRoutes handles movies, genres, platforms, statistics
+app.use('/api/health', healthRoutes); // health routes
 
 // Root endpoint
 app.get('/', (req, res) => {
@@ -59,7 +55,6 @@ app.use((req, res) => {
 // Error handler
 app.use((err, req, res, next) => {
   logger.error('Unhandled error:', err);
-  
   res.status(500).json({
     success: false,
     error: 'Internal server error'
@@ -67,3 +62,4 @@ app.use((err, req, res, next) => {
 });
 
 module.exports = app;
+

@@ -4,10 +4,8 @@ const catalogUpdateJob = require('../../jobs/catalogUpdateJob');
 
 const router = express.Router();
 
-/**
- * Basic health check
- */
-router.get('/health', (req, res) => {
+// GET /api/health
+router.get('/', (req, res) => {
   res.json({
     success: true,
     status: 'healthy',
@@ -15,10 +13,8 @@ router.get('/health', (req, res) => {
   });
 });
 
-/**
- * Detailed health check
- */
-router.get('/health/detailed', async (req, res) => {
+// GET /api/health/detailed
+router.get('/detailed', async (req, res) => {
   const health = {
     status: 'healthy',
     timestamp: new Date().toISOString(),
@@ -28,25 +24,20 @@ router.get('/health/detailed', async (req, res) => {
     }
   };
 
-  // Check database connection
-  try {
-    if (mongoose.connection.readyState === 1) {
-      health.services.database = 'connected';
-    } else {
-      health.services.database = 'disconnected';
-      health.status = 'degraded';
-    }
-  } catch (error) {
-    health.services.database = 'error';
-    health.status = 'unhealthy';
+  // Check MongoDB
+  if (mongoose.connection.readyState === 1) {
+    health.services.database = 'connected';
+  } else {
+    health.services.database = 'disconnected';
+    health.status = 'degraded';
   }
 
-  // Check ingestion job status
+  // Check ingestion job
   try {
     const jobStatus = catalogUpdateJob.getStatus();
     health.services.ingestionJob = jobStatus.isScheduled ? 'scheduled' : 'not_scheduled';
     health.jobDetails = jobStatus;
-  } catch (error) {
+  } catch {
     health.services.ingestionJob = 'error';
   }
 
