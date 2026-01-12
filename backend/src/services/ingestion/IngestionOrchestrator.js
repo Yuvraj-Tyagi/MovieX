@@ -18,7 +18,6 @@ class IngestionOrchestrator {
       syncGenres = false,
       ingestMovies = true,
       enrichMovies = true,
-      maxPagesPerPlatform = 10,
       maxMoviesToEnrich = 50,
       platformIds = null
     } = options;
@@ -95,23 +94,21 @@ class IngestionOrchestrator {
         logger.info('[Step 3/4] Ingesting movies from JustWatch...');
         try {
           let ingestionResult;
-          
+
           if (platformIds && platformIds.length > 0) {
-            ingestionResult = await justWatchIngestion.ingestFromPlatforms(
-              platformIds,
-              maxPagesPerPlatform
-            );
+            // Fetch all movies for each selected platform
+            ingestionResult = await justWatchIngestion.ingestFromProviders(platformIds);
           } else {
-            ingestionResult = await justWatchIngestion.ingestFromAllPlatforms(
-              maxPagesPerPlatform
-            );
+            // Fetch all movies from all platforms
+            ingestionResult = await justWatchIngestion.ingestFromAllProviders();
           }
 
           results.moviesIngestion = {
             success: true,
-            ...ingestionResult.summary
+            totalMovies: ingestionResult.totalMovies,
+            totalAvailabilities: ingestionResult.totalAvailabilities
           };
-          logger.info(`✓ Movie ingestion complete: ${ingestionResult.summary.totalMovies} movies, ${ingestionResult.summary.totalAvailabilities} availabilities`);
+          logger.info(`✓ Movie ingestion complete: ${ingestionResult.totalMovies} movies, ${ingestionResult.totalAvailabilities} availabilities`);
         } catch (error) {
           logger.error('✗ Movie ingestion failed:', error);
           results.moviesIngestion = {
@@ -127,9 +124,7 @@ class IngestionOrchestrator {
       if (enrichMovies) {
         logger.info('[Step 4/4] Enriching movies with TMDB data...');
         try {
-          const enrichmentResult = await tmdbEnrichment.enrichPendingMovies(
-            maxMoviesToEnrich
-          );
+          const enrichmentResult = await tmdbEnrichment.enrichPendingMovies(maxMoviesToEnrich);
 
           results.moviesEnrichment = {
             success: true,
@@ -177,7 +172,7 @@ class IngestionOrchestrator {
   /**
    * Bootstrap catalog (initial setup)
    */
-  async bootstrap(platformIds = null, maxPagesPerPlatform = 20) {
+  async bootstrap(platformIds = null) {
     logger.info('=================================================');
     logger.info('BOOTSTRAP: Initializing catalog from scratch');
     logger.info('=================================================');
@@ -187,7 +182,6 @@ class IngestionOrchestrator {
       syncGenres: true,
       ingestMovies: true,
       enrichMovies: true,
-      maxPagesPerPlatform,
       maxMoviesToEnrich: 100,
       platformIds
     });
@@ -206,7 +200,6 @@ class IngestionOrchestrator {
       syncGenres: false,
       ingestMovies: true,
       enrichMovies: true,
-      maxPagesPerPlatform: 5,
       maxMoviesToEnrich: 50
     });
   }

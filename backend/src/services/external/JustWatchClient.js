@@ -14,7 +14,7 @@ class JustWatchClient {
     this.client = axios.create({
       timeout: 15000,
       headers: {
-        'Content-Type': 'application/json', // FIX: always send
+        'Content-Type': 'application/json',
         'User-Agent':
           'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         'Accept': 'application/json',
@@ -37,16 +37,9 @@ class JustWatchClient {
           const requestConfig = {
             method,
             url,
-            headers: {
-              ...this.client.defaults.headers,
-              ...headers
-            }
+            headers: { ...this.client.defaults.headers, ...headers }
           };
-
-          if (data) {
-            requestConfig.data = data;
-          }
-
+          if (data) requestConfig.data = data;
           const response = await this.client(requestConfig);
           return response.data;
         } catch (error) {
@@ -76,8 +69,8 @@ class JustWatchClient {
       logger.debug(`Fetching JustWatch providers for region: ${this.region}`);
 
       const query = `
-        query GetProviders($country: Country!) {
-          packages(country: $country, platform: WEB) {
+        query GetPackages($country: Country!) {
+          packages(country: $country) {
             id
             packageId
             clearName
@@ -88,15 +81,9 @@ class JustWatchClient {
         }
       `;
 
-      const variables = {
-        country: this.region // FIX: use config region
-      };
+      const variables = { country: this.region };
 
-      const response = await this.request(
-        this.graphqlUrl,
-        'POST',
-        { query, variables }
-      );
+      const response = await this.request(this.graphqlUrl, 'POST', { query, variables });
 
       return response.data?.packages || [];
     } catch (error) {
@@ -106,58 +93,31 @@ class JustWatchClient {
   }
 
   /**
-   * Search for titles using GraphQL
+   * Search for popular titles using updated GraphQL schema
    */
   async searchTitlesGraphQL(options = {}) {
     try {
-      const {
-        providers = [],
-        page = 1,
-        pageSize = 30,
-        contentTypes = ['MOVIE']
-      } = options;
+      const { page = 1, pageSize = 30 } = options;
 
       logger.debug(`Searching JustWatch titles (page ${page})`);
 
       const query = `
-        query GetPopularTitles(
-          $country: Country!
-          $language: Language!
-          $first: Int!
-          $page: Int
-          $packages: [String!]
-          $objectTypes: [ObjectType!]
-        ) {
-          popularTitles(
-            country: $country
-            first: $first
-            page: $page
-            packages: $packages
-            sortBy: POPULAR
-            objectTypes: $objectTypes
-          ) {
+        query GetPopularTitles($country: Country!, $first: Int!) {
+          popularTitles(country: $country, first: $first) {
             edges {
               node {
                 id
                 objectId
                 objectType
-                content(country: $country, language: $language) {
+                content(country: $country, language: "en") {
                   title
                   originalReleaseYear
                   originalReleaseDate
                   shortDescription
                   posterUrl
-                  backdrops {
-                    backdropUrl
-                  }
-                  externalIds {
-                    imdbId
-                    tmdbId
-                  }
-                  genres {
-                    shortName
-                    translation(language: $language)
-                  }
+                  backdrops { backdropUrl }
+                  externalIds { imdbId tmdbId }
+                  genres { shortName translation(language: "en") }
                 }
                 offers(country: $country, platform: WEB) {
                   monetizationType
@@ -171,29 +131,15 @@ class JustWatchClient {
                 }
               }
             }
-            pageInfo {
-              endCursor
-              hasNextPage
-            }
+            pageInfo { endCursor hasNextPage }
             totalCount
           }
         }
       `;
 
-      const variables = {
-        country: this.region,     // FIX
-        language: this.language,  // FIX
-        first: pageSize,
-        page: page - 1,
-        objectTypes: contentTypes,
-        ...(providers.length > 0 ? { packages: providers } : {}) // FIX: no undefined
-      };
+      const variables = { country: this.region, first: pageSize };
 
-      const response = await this.request(
-        this.graphqlUrl,
-        'POST',
-        { query, variables }
-      );
+      const response = await this.request(this.graphqlUrl, 'POST', { query, variables });
 
       const edges = response.data?.popularTitles?.edges || [];
       const items = edges.map(edge => this.normalizeGraphQLNode(edge.node));
@@ -213,30 +159,27 @@ class JustWatchClient {
   }
 
   /**
-   * Get titles by provider using GraphQL
+   * Get titles by provider
    */
   async getTitlesByProvider(providerId, page = 1, pageSize = 30) {
     try {
       logger.debug(`Fetching titles from provider ${providerId}, page ${page}`);
 
-      return await this.searchTitlesGraphQL({
-        providers: [providerId],
-        page,
-        pageSize,
-        contentTypes: ['MOVIE']
-      });
+      // Instead of using packages, we filter after getting popularTitles
+      const result = await this.searchTitlesGraphQL({ page, pageSize });
+      const filteredItems = result.items.filter(item =>
+        item.offers.some(o => o.providerId?.toString() === providerId)
+      );
+
+      return { ...result, items: filteredItems };
     } catch (error) {
       logger.error(`Error fetching titles from provider ${providerId}:`, error.message);
       return { items: [], total_pages: 0 };
     }
   }
 
-  /**
-   * Normalize GraphQL node to old format
-   */
   normalizeGraphQLNode(node) {
     const content = node.content || {};
-
     return {
       id: node.objectId?.toString() || node.id,
       object_type: node.objectType,
@@ -256,13 +199,9 @@ class JustWatchClient {
     };
   }
 
-  /**
-   * Get title details by JustWatch ID
-   */
   async getTitleDetails(justWatchId) {
     try {
       logger.debug(`Fetching JustWatch title details: ${justWatchId}`);
-
       const endpoint = `${this.baseUrl}/content/titles/movie/${justWatchId}/locale/${this.region}`;
       return await this.request(endpoint);
     } catch (error) {
@@ -271,22 +210,19 @@ class JustWatchClient {
     }
   }
 
-  /**
-   * Search for titles by query
-   */
   async searchTitles(query, page = 1) {
     try {
       logger.debug(`Searching JustWatch for: ${query}`);
 
       const graphqlQuery = `
-        query SearchTitles($searchQuery: String!, $country: Country!, $language: Language!) {
-          titleSearch(searchQuery: $searchQuery, country: $country, language: $language, first: 10) {
+        query SearchTitles($searchQuery: String!, $country: Country!) {
+          titleSearch(searchQuery: $searchQuery, country: $country, first: 10) {
             edges {
               node {
                 id
                 objectId
                 objectType
-                content(country: $country, language: $language) {
+                content(country: $country, language: "en") {
                   title
                   originalReleaseYear
                 }
@@ -296,18 +232,10 @@ class JustWatchClient {
         }
       `;
 
-      const response = await this.request(
-        this.graphqlUrl,
-        'POST',
-        {
-          query: graphqlQuery,
-          variables: {
-            searchQuery: query,
-            country: this.region,   // FIX
-            language: this.language // FIX
-          }
-        }
-      );
+      const response = await this.request(this.graphqlUrl, 'POST', {
+        query: graphqlQuery,
+        variables: { searchQuery: query, country: this.region }
+      });
 
       const edges = response.data?.titleSearch?.edges || [];
       return edges.map(edge => this.normalizeGraphQLNode(edge.node));
@@ -317,9 +245,6 @@ class JustWatchClient {
     }
   }
 
-  /**
-   * Normalize JustWatch movie data
-   */
   normalizeMovieData(jwMovie) {
     const releaseYear =
       jwMovie.original_release_year ||
@@ -340,30 +265,20 @@ class JustWatchClient {
     };
   }
 
-  /**
-   * Normalize poster path from JustWatch
-   */
   normalizePosterPath(poster) {
     if (!poster) return null;
-
     if (typeof poster === 'string') {
       if (poster.startsWith('http')) return poster;
-
       if (poster.includes('/poster/')) {
         const match = poster.match(/\/poster\/(\d+)/);
         return match ? `/jw_poster_${match[1]}` : null;
       }
     }
-
     return poster;
   }
 
-  /**
-   * Extract offers (availability)
-   */
   extractOffers(jwMovie) {
     if (!jwMovie.offers || jwMovie.offers.length === 0) return [];
-
     return jwMovie.offers.map(offer => ({
       providerId: offer.package?.packageId?.toString() || offer.package?.id?.toString(),
       providerName: offer.package?.clearName || null,
@@ -373,9 +288,6 @@ class JustWatchClient {
     }));
   }
 
-  /**
-   * Map monetization type
-   */
   mapMonetizationType(jwType) {
     const typeMap = {
       FLATRATE: 'flatrate',
@@ -385,16 +297,11 @@ class JustWatchClient {
       FREE: 'free',
       FLATRATE_AND_BUY: 'flatrate'
     };
-
     return typeMap[jwType?.toUpperCase()] || 'flatrate';
   }
 
-  /**
-   * Extract genres
-   */
   extractGenres(jwMovie) {
     if (!jwMovie.genres) return [];
-
     return jwMovie.genres.map(genre => ({
       name: genre.translation || genre.shortName,
       slug: genre.shortName
@@ -403,3 +310,4 @@ class JustWatchClient {
 }
 
 module.exports = new JustWatchClient();
+
