@@ -104,10 +104,10 @@ class IngestionOrchestrator {
 
           if (platformIds && platformIds.length > 0) {
             // Fetch all movies for each selected platform
-            ingestionResult = await justWatchIngestion.ingestFromProviders(platformIds);
+            ingestionResult = await justWatchIngestion.ingestFromAllPlatforms(platformIds);
           } else {
             // Fetch all movies from all platforms
-            ingestionResult = await justWatchIngestion.ingestFromAllProviders();
+            ingestionResult = await justWatchIngestion.ingestFromAllPlatforms();
           }
 
           results.moviesIngestion = {
