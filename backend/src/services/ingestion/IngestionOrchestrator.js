@@ -58,10 +58,14 @@ class IngestionOrchestrator {
           };
           logger.info(`✓ Platform sync complete: ${platforms.length} platforms`);
         } catch (error) {
-          logger.error('✗ Platform sync failed:', error);
+          logger.error('✗ Platform sync failed:', {
+            message: error.message,
+            stack: error.stack,
+            response: error.response?.data || null
+          });
           results.platformsSync = {
             success: false,
-            error: error.message
+            error: error.message || 'Unknown error'
           };
         }
       } else {
@@ -79,10 +83,13 @@ class IngestionOrchestrator {
           };
           logger.info(`✓ Genre sync complete: ${genres.length} genres`);
         } catch (error) {
-          logger.error('✗ Genre sync failed:', error);
+          logger.error('✗ Genre sync failed:', {
+            message: error.message,
+            stack: error.stack
+          });
           results.genresSync = {
             success: false,
-            error: error.message
+            error: error.message || 'Unknown error'
           };
         }
       } else {
@@ -105,15 +112,19 @@ class IngestionOrchestrator {
 
           results.moviesIngestion = {
             success: true,
-            totalMovies: ingestionResult.totalMovies,
-            totalAvailabilities: ingestionResult.totalAvailabilities
+            totalMovies: ingestionResult?.totalMovies || 0,
+            totalAvailabilities: ingestionResult?.totalAvailabilities || 0
           };
-          logger.info(`✓ Movie ingestion complete: ${ingestionResult.totalMovies} movies, ${ingestionResult.totalAvailabilities} availabilities`);
+          logger.info(`✓ Movie ingestion complete: ${results.moviesIngestion.totalMovies} movies, ${results.moviesIngestion.totalAvailabilities} availabilities`);
         } catch (error) {
-          logger.error('✗ Movie ingestion failed:', error);
+          logger.error('✗ Movie ingestion failed:', {
+            message: error.message,
+            stack: error.stack,
+            response: error.response?.data || null
+          });
           results.moviesIngestion = {
             success: false,
-            error: error.message
+            error: error.message || 'Unknown error'
           };
         }
       } else {
@@ -132,10 +143,13 @@ class IngestionOrchestrator {
           };
           logger.info(`✓ Movie enrichment complete: ${enrichmentResult.enriched} enriched, ${enrichmentResult.failed} failed`);
         } catch (error) {
-          logger.error('✗ Movie enrichment failed:', error);
+          logger.error('✗ Movie enrichment failed:', {
+            message: error.message,
+            stack: error.stack
+          });
           results.moviesEnrichment = {
             success: false,
-            error: error.message
+            error: error.message || 'Unknown error'
           };
         }
       } else {
@@ -154,10 +168,13 @@ class IngestionOrchestrator {
 
       return results;
     } catch (error) {
-      logger.error('Pipeline execution failed:', error);
+      logger.error('Pipeline execution failed:', {
+        message: error.message,
+        stack: error.stack
+      });
       
       results.success = false;
-      results.error = error.message;
+      results.error = error.message || 'Unknown error';
       results.duration = Date.now() - startTime;
 
       this.lastRunTime = new Date();
@@ -217,3 +234,4 @@ class IngestionOrchestrator {
 }
 
 module.exports = new IngestionOrchestrator();
+

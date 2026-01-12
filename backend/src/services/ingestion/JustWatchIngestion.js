@@ -65,10 +65,22 @@ class JustWatchIngestion {
       while (page <= maxPages) {
         logger.info(`Fetching page ${page} for ${platform.name}...`);
 
-        const response = await justWatchClient.getTitlesByProvider(platformId, page);
-        
+        let response;
+        try {
+          response = await justWatchClient.getTitlesByProvider(platformId, page);
+        } catch (error) {
+          logger.error(`Failed to fetch titles for platform ${platform.name} on page ${page}`, {
+            message: error.message,
+            stack: error.stack,
+            response: error.response?.data || null
+          });
+          break; // stop paging this platform
+        }
+
         if (!response.items || response.items.length === 0) {
-          logger.info(`No more items on page ${page}, stopping`);
+          logger.warn(`No items returned from JustWatch for platform ${platform.name} on page ${page}`, {
+            response
+          });
           break;
         }
 
@@ -82,7 +94,10 @@ class JustWatchIngestion {
               totalAvailabilities += result.availabilitiesCreated;
             }
           } catch (error) {
-            logger.error(`Error processing movie ${jwMovie.id}:`, error.message);
+            logger.error(`Error processing movie ${jwMovie.id}:`, {
+              message: error.message,
+              stack: error.stack
+            });
           }
         }
 
@@ -118,8 +133,13 @@ class JustWatchIngestion {
    */
   async processJustWatchMovie(jwMovie, platform) {
     try {
-      // Normalize JustWatch data
-      const movieData = justWatchClient.normalizeMovieData(jwMovie);
+      let movieData;
+      try {
+        movieData = justWatchClient.normalizeMovieData(jwMovie);
+      } catch (err) {
+        logger.error(`Failed to normalize JustWatch movie ${jwMovie.id}`, { error: err });
+        return null;
+      }
 
       // Check if movie already exists
       let movie = await movieRepository.findByJustWatchId(movieData.justWatchId);
@@ -133,12 +153,8 @@ class JustWatchIngestion {
         };
 
         // Only update TMDB/IMDb IDs if they're missing
-        if (!movie.tmdbId && movieData.tmdbId) {
-          updateData.tmdbId = movieData.tmdbId;
-        }
-        if (!movie.imdbId && movieData.imdbId) {
-          updateData.imdbId = movieData.imdbId;
-        }
+        if (!movie.tmdbId && movieData.tmdbId) updateData.tmdbId = movieData.tmdbId;
+        if (!movie.imdbId && movieData.imdbId) updateData.imdbId = movieData.imdbId;
 
         movie = await movieRepository.update(movie._id, updateData);
       } else {
@@ -152,7 +168,6 @@ class JustWatchIngestion {
       let availabilitiesCreated = 0;
 
       for (const offer of offers) {
-        // Find or create the platform for this offer
         let offerPlatform = platform;
         
         if (offer.providerId && offer.providerId !== platform.justWatchId) {
@@ -166,9 +181,7 @@ class JustWatchIngestion {
           }
         }
 
-        if (!offerPlatform) {
-          continue;
-        }
+        if (!offerPlatform) continue;
 
         // Create or update availability
         await availabilityRepository.upsert({
@@ -182,10 +195,7 @@ class JustWatchIngestion {
         availabilitiesCreated++;
       }
 
-      return {
-        movie,
-        availabilitiesCreated
-      };
+      return { movie, availabilitiesCreated };
     } catch (error) {
       logger.error(`Error processing JustWatch movie:`, error);
       throw error;
@@ -242,12 +252,15 @@ class JustWatchIngestion {
       
       if (platforms.length === 0) {
         logger.warn('No active platforms found');
-        return { results: [], summary: {} };
+        return { results: [], summary: { totalMovies: 0, totalAvailabilities: 0, errors: 0 } };
       }
 
       const platformIds = platforms.map(p => p.justWatchId);
       
-      return await this.ingestFromPlatforms(platformIds, maxPagesPerPlatform);
+      return (await this.ingestFromPlatforms(platformIds, maxPagesPerPlatform)) || {
+        results: [],
+        summary: { totalMovies: 0, totalAvailabilities: 0, errors: 0 }
+      };
     } catch (error) {
       logger.error('Error ingesting from all platforms:', error);
       throw error;
@@ -256,3 +269,4 @@ class JustWatchIngestion {
 }
 
 module.exports = new JustWatchIngestion();
+
