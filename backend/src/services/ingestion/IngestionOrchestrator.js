@@ -103,17 +103,18 @@ class IngestionOrchestrator {
           let ingestionResult;
 
           if (platformIds && platformIds.length > 0) {
-            // Fetch all movies for each selected platform
-            ingestionResult = await justWatchIngestion.ingestFromAllPlatforms(platformIds);
+            // Fetch movies from specific platforms
+            ingestionResult = await justWatchIngestion.ingestFromPlatforms(platformIds);
           } else {
-            // Fetch all movies from all platforms
+            // Fetch movies from all active platforms
             ingestionResult = await justWatchIngestion.ingestFromAllPlatforms();
           }
 
           results.moviesIngestion = {
             success: true,
-            totalMovies: ingestionResult?.totalMovies || 0,
-            totalAvailabilities: ingestionResult?.totalAvailabilities || 0
+            totalMovies: ingestionResult?.summary?.totalMovies || 0,
+            totalAvailabilities: ingestionResult?.summary?.totalAvailabilities || 0,
+            errors: ingestionResult?.summary?.errors || 0
           };
           logger.info(`✓ Movie ingestion complete: ${results.moviesIngestion.totalMovies} movies, ${results.moviesIngestion.totalAvailabilities} availabilities`);
         } catch (error) {

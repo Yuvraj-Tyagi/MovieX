@@ -7,9 +7,13 @@ class JustWatchClient {
   constructor() {
     this.baseUrl = 'https://apis.justwatch.com';
     this.graphqlUrl = 'https://apis.justwatch.com/graphql';
-    this.region = config.justWatch.region || 'IN';
+
+    // Parse region - handle both 'IN' and 'en_IN' formats
+    const rawRegion = config.justWatch.region || 'IN';
+    this.region = rawRegion.includes('_') ? rawRegion.split('_')[1] : rawRegion;
     this.language = config.justWatch.language || 'en';
     this.rateLimiter = new RateLimiter(config.justWatch.requestsPerSecond);
+    this.cursorCache = {};
 
     this.client = axios.create({
       timeout: 15000,
@@ -149,23 +153,123 @@ class JustWatchClient {
     }
   }
 
-  async getTitlesByProvider(providerId) {
+  /**
+   * Fetch popular movies with pagination (not filtered by provider)
+   * Movies are processed with all their offers/availability
+   */
+  async getPopularMovies(page = 1, pageSize = 50) {
     try {
-      logger.debug(`Fetching titles for provider ${providerId}`);
-      const result = await this.searchTitlesGraphQL({ pageSize: 50 });
+      logger.debug(`Fetching popular movies, page ${page}`);
 
-      const filteredItems = result.items.filter(item =>
-        item.offers?.some(o =>
-          (o.providerId && o.providerId.toString() === providerId.toString()) ||
-          (o.providerName && o.providerName.toLowerCase().includes('amazon')) // fallback example
-        )
-      );
+      const query = `
+        query GetPopularTitles(
+          $country: Country!,
+          $first: Int!,
+          $after: String
+        ) {
+          popularTitles(
+            country: $country,
+            first: $first,
+            after: $after,
+            filter: {
+              objectTypes: [MOVIE]
+            }
+          ) {
+            edges {
+              cursor
+              node {
+                id
+                objectId
+                objectType
+                content(country: $country, language: "en") {
+                  title
+                  originalReleaseYear
+                  originalReleaseDate
+                  shortDescription
+                  posterUrl
+                  backdrops { backdropUrl }
+                  externalIds { imdbId tmdbId }
+                  genres { shortName translation(language: "en") }
+                }
+                offers(country: $country, platform: WEB) {
+                  monetizationType
+                  presentationType
+                  package {
+                    id
+                    packageId
+                    clearName
+                  }
+                  standardWebURL
+                }
+              }
+            }
+            pageInfo {
+              endCursor
+              hasNextPage
+            }
+            totalCount
+          }
+        }
+      `;
 
-      return { ...result, items: filteredItems };
+      let afterCursor = null;
+      if (page > 1 && this.cursorCache['popular']) {
+        afterCursor = this.cursorCache['popular'][page - 1] || null;
+      }
+
+      const variables = {
+        country: this.region,
+        first: pageSize,
+        after: afterCursor
+      };
+
+      logger.debug(`GraphQL request: country=${this.region}, first=${pageSize}, after=${afterCursor}`);
+
+      const response = await this.request(this.graphqlUrl, 'POST', { query, variables });
+
+      if (response.errors) {
+        logger.error('GraphQL errors:', response.errors);
+        return { items: [], total_pages: 0, page, has_next_page: false };
+      }
+
+      const data = response.data?.popularTitles;
+      if (!data) {
+        logger.warn('No popularTitles data in response');
+        return { items: [], total_pages: 0, page, has_next_page: false };
+      }
+
+      const edges = data.edges || [];
+      const items = edges.map(edge => this.normalizeGraphQLNode(edge.node));
+
+      // Store cursor for next page
+      const pageInfo = data.pageInfo || {};
+      if (pageInfo.endCursor) {
+        if (!this.cursorCache['popular']) {
+          this.cursorCache['popular'] = {};
+        }
+        this.cursorCache['popular'][page] = pageInfo.endCursor;
+      }
+
+      const totalCount = data.totalCount || items.length;
+      const totalPages = Math.ceil(totalCount / pageSize);
+
+      logger.info(`Fetched ${items.length} movies (page ${page}/${totalPages}, total: ${totalCount})`);
+
+      return {
+        items,
+        page,
+        total_pages: totalPages,
+        total_count: totalCount,
+        has_next_page: pageInfo.hasNextPage || false
+      };
     } catch (error) {
-      logger.error(`Error fetching titles from provider ${providerId}:`, error.message);
-      return { items: [], total_pages: 0 };
+      logger.error('Error fetching popular movies:', error.message);
+      return { items: [], total_pages: 0, page: 1, has_next_page: false };
     }
+  }
+
+  clearCursorCache() {
+    this.cursorCache = {};
   }
 
   normalizeGraphQLNode(node) {
