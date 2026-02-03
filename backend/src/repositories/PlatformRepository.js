@@ -32,17 +32,24 @@ class PlatformRepository {
    */
   async findOrCreate(platformData) {
     try {
-      const existing = await this.findByJustWatchId(platformData.justWatchId);
-      
+      // First try to find by justWatchId
+      let existing = await this.findByJustWatchId(platformData.justWatchId);
       if (existing) {
         return existing;
       }
 
-      // Generate slug if not provided
+      // Generate slug
       const slug = platformData.slug || platformData.name.toLowerCase()
         .replace(/[^a-z0-9]+/g, '-')
         .replace(/^-+|-+$/g, '');
 
+      // Also try to find by slug (handles case where same platform has different JustWatch IDs)
+      existing = await Platform.findOne({ slug });
+      if (existing) {
+        return existing;
+      }
+
+      // Create new platform
       const platform = new Platform({
         ...platformData,
         slug
@@ -52,6 +59,16 @@ class PlatformRepository {
       logger.debug(`Created new platform: ${platform.name} (slug: ${platform.slug})`);
       return platform;
     } catch (error) {
+      // Handle race condition - another process created it
+      if (error.code === 11000) {
+        const slug = platformData.slug || platformData.name.toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-+|-+$/g, '');
+        const existing = await Platform.findOne({
+          $or: [{ justWatchId: platformData.justWatchId }, { slug }]
+        });
+        if (existing) return existing;
+      }
       logger.error('Error in findOrCreate platform:', error);
       throw error;
     }

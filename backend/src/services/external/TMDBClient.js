@@ -145,6 +145,48 @@ class TMDBClient {
    * Normalize movie data from TMDB
    */
   normalizeMovieData(tmdbMovie) {
+    // Extract directors from crew
+    const directors = (tmdbMovie.credits?.crew || [])
+      .filter(person => person.job === 'Director')
+      .slice(0, 5)
+      .map(person => ({
+        tmdbId: person.id,
+        name: person.name,
+        profilePath: person.profile_path
+      }));
+
+    // Extract top 15 cast members
+    const cast = (tmdbMovie.credits?.cast || [])
+      .slice(0, 15)
+      .map(person => ({
+        tmdbId: person.id,
+        name: person.name,
+        character: person.character,
+        profilePath: person.profile_path,
+        order: person.order
+      }));
+
+    // Extract writers from crew
+    const writers = (tmdbMovie.credits?.crew || [])
+      .filter(person => person.department === 'Writing')
+      .slice(0, 5)
+      .map(person => ({
+        tmdbId: person.id,
+        name: person.name,
+        profilePath: person.profile_path,
+        job: person.job
+      }));
+
+    // Extract production companies
+    const productionCompanies = (tmdbMovie.production_companies || [])
+      .slice(0, 10)
+      .map(company => ({
+        tmdbId: company.id,
+        name: company.name,
+        logoPath: company.logo_path,
+        originCountry: company.origin_country
+      }));
+
     return {
       tmdbId: tmdbMovie.id,
       imdbId: tmdbMovie.imdb_id || tmdbMovie.external_ids?.imdb_id || null,
@@ -169,7 +211,12 @@ class TMDBClient {
       productionCountries: tmdbMovie.production_countries?.map(c => ({
         iso: c.iso_3166_1,
         name: c.name
-      })) || []
+      })) || [],
+      // Cast & Crew
+      directors,
+      cast,
+      writers,
+      productionCompanies
     };
   }
 

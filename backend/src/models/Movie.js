@@ -108,6 +108,46 @@ const movieSchema = new mongoose.Schema({
     name: String
   }],
 
+  // Cast & Crew
+  directors: [{
+    tmdbId: Number,
+    name: String,
+    profilePath: String
+  }],
+
+  cast: [{
+    tmdbId: Number,
+    name: String,
+    character: String,
+    profilePath: String,
+    order: Number
+  }],
+
+  writers: [{
+    tmdbId: Number,
+    name: String,
+    profilePath: String,
+    job: String  // "Screenplay", "Writer", etc.
+  }],
+
+  productionCompanies: [{
+    tmdbId: Number,
+    name: String,
+    logoPath: String,
+    originCountry: String
+  }],
+
+  // Denormalized platform availability for easy filtering
+  platforms: [{
+    platformId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Platform'
+    },
+    platformName: String,
+    platformSlug: String,
+    monetizationTypes: [String]
+  }],
+
   // Enrichment Status
   isEnriched: {
     type: Boolean,
@@ -131,6 +171,11 @@ const movieSchema = new mongoose.Schema({
 movieSchema.index({ releaseYear: -1, popularity: -1 });
 movieSchema.index({ voteAverage: -1, voteCount: -1 });
 movieSchema.index({ genres: 1, releaseYear: -1 });
+
+// Indexes for cast/crew and platform searches
+movieSchema.index({ 'directors.name': 1 });
+movieSchema.index({ 'cast.name': 1 });
+movieSchema.index({ 'platforms.platformSlug': 1 });
 
 // Virtual for full poster URL
 movieSchema.virtual('posterUrl').get(function() {

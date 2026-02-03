@@ -342,9 +342,27 @@ class JustWatchClient {
       providerId: offer.package?.packageId?.toString() || offer.package?.id?.toString(),
       providerName: offer.package?.clearName || null,
       monetizationType: this.mapMonetizationType(offer.monetizationType),
-      quality: offer.presentationType || 'unknown',
+      quality: this.normalizeQuality(offer.presentationType),
       url: offer.standardWebURL || null
     }));
+  }
+
+  normalizeQuality(quality) {
+    if (!quality) return 'unknown';
+    const q = quality.toUpperCase();
+    const qualityMap = {
+      'SD': 'SD',
+      'HD': 'HD',
+      'UHD': 'UHD',
+      '4K': '4K',
+      '_4K': '4K',
+      'BLURAY': 'HD',
+      'DVD': 'SD',
+      'CANVAS': 'HD',  // Canvas is typically HD streaming
+      'THEATER': 'HD',
+      'WEB': 'HD'
+    };
+    return qualityMap[q] || 'unknown';
   }
 
   mapMonetizationType(jwType) {

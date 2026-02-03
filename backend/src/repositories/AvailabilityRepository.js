@@ -218,6 +218,46 @@ class AvailabilityRepository {
   }
 
   /**
+   * Build platform summary for a movie (denormalized platforms array)
+   */
+  async buildPlatformSummary(movieId) {
+    try {
+      return await Availability.aggregate([
+        { $match: { movie: movieId, isAvailable: true } },
+        {
+          $lookup: {
+            from: 'platforms',
+            localField: 'platform',
+            foreignField: '_id',
+            as: 'platformData'
+          }
+        },
+        { $unwind: '$platformData' },
+        {
+          $group: {
+            _id: '$platform',
+            platformName: { $first: '$platformData.name' },
+            platformSlug: { $first: '$platformData.slug' },
+            monetizationTypes: { $addToSet: '$monetizationType' }
+          }
+        },
+        {
+          $project: {
+            platformId: '$_id',
+            platformName: 1,
+            platformSlug: 1,
+            monetizationTypes: 1,
+            _id: 0
+          }
+        }
+      ]);
+    } catch (error) {
+      logger.error('Error building platform summary:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Get availability statistics
    */
   async getStatistics() {

@@ -224,6 +224,16 @@ class JustWatchIngestion {
         }
       }
 
+      // After processing all offers, update movie with platform summary
+      if (availabilitiesCreated > 0) {
+        try {
+          const platformSummary = await availabilityRepository.buildPlatformSummary(movie._id);
+          await movieRepository.update(movie._id, { platforms: platformSummary });
+        } catch (err) {
+          logger.warn(`Failed to sync platform summary for movie ${movie._id}: ${err.message}`);
+        }
+      }
+
       return { movie, availabilitiesCreated };
     } catch (error) {
       logger.error(`Error processing JustWatch movie:`, error);
