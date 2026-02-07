@@ -295,9 +295,47 @@ class JustWatchClient {
 
   async getTitleDetails(justWatchId) {
     try {
-      logger.debug(`Fetching JustWatch title details: ${justWatchId}`);
-      const endpoint = `${this.baseUrl}/content/titles/movie/${justWatchId}/locale/${this.region}`;
-      return await this.request(endpoint);
+      logger.debug(`Fetching JustWatch title details via GraphQL: ${justWatchId}`);
+
+      const nodeId = `tm${justWatchId}`;
+      const query = `
+        query GetTitleNode($nodeId: ID!, $country: Country!) {
+          node(id: $nodeId) {
+            ... on MovieOrShowOrSeason {
+              id
+              objectId
+              objectType
+              content(country: $country, language: "en") {
+                title
+                originalReleaseYear
+                originalReleaseDate
+                shortDescription
+                posterUrl
+                backdrops { backdropUrl }
+                externalIds { imdbId tmdbId }
+                genres { shortName translation(language: "en") }
+              }
+              offers(country: $country, platform: WEB) {
+                monetizationType
+                presentationType
+                package {
+                  id
+                  packageId
+                  clearName
+                }
+                standardWebURL
+              }
+            }
+          }
+        }
+      `;
+
+      const variables = { nodeId, country: this.region };
+      const response = await this.request(this.graphqlUrl, 'POST', { query, variables });
+
+      if (!response.data?.node) return null;
+
+      return this.normalizeGraphQLNode(response.data.node);
     } catch (error) {
       logger.error(`Error fetching JustWatch title ${justWatchId}:`, error.message);
       return null;

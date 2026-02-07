@@ -3,6 +3,7 @@ const database = require('../src/config/database');
 const Movie = require('../src/models/Movie');
 const Platform = require('../src/models/Platform');
 const Availability = require('../src/models/Availability');
+require('../src/models/Genre'); // Register Genre schema for populate
 const jwClient = require('../src/services/external/JustWatchClient');
 const availabilityRepository = require('../src/repositories/AvailabilityRepository');
 const movieRepository = require('../src/repositories/MovieRepository');
@@ -51,11 +52,13 @@ async function refreshAvailability() {
     logger.info(`Loaded ${platforms.length} platforms`);
 
     // Get movies that need availability refresh (no platforms or empty)
+    // Exclude tmdb_* movies - those need fix-justwatch-ids.js first
     const query = {
       $or: [
         { platforms: { $exists: false } },
         { platforms: { $size: 0 } }
-      ]
+      ],
+      justWatchId: { $not: /^tmdb_/ }
     };
 
     const totalCount = await Movie.countDocuments(query);
@@ -142,7 +145,7 @@ async function refreshAvailability() {
         } catch (error) {
           errors++;
           processed++;
-          logger.debug(`Error processing ${movie.title}: ${error.message}`);
+          logger.warn(`Error processing ${movie.title} (JW: ${movie.justWatchId}): ${error.message}`);
         }
 
         // Progress log
