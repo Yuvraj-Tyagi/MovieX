@@ -214,7 +214,7 @@ class IngestionOrchestrator {
     logger.info('=================================================');
 
     return await this.executePipeline({
-      syncPlatforms: false,
+      syncPlatforms: true,
       syncGenres: false,
       ingestMovies: true,
       enrichMovies: true,

@@ -189,15 +189,16 @@ class JustWatchIngestion {
           offerPlatform = await platformRepository.findByJustWatchId(offer.providerId);
 
           // Create platform if it doesn't exist
-          if (!offerPlatform && offer.providerName) {
+          if (!offerPlatform) {
+            const platformName = offer.providerName || `Provider ${offer.providerId}`;
             try {
               offerPlatform = await platformRepository.findOrCreate({
                 justWatchId: offer.providerId,
-                name: offer.providerName
+                name: platformName
               });
-              logger.debug(`Created platform: ${offer.providerName}`);
+              logger.info(`Auto-created platform: ${platformName} (JW ID: ${offer.providerId})`);
             } catch (err) {
-              logger.warn(`Failed to create platform ${offer.providerName}: ${err.message}`);
+              logger.warn(`Failed to create platform ${platformName}: ${err.message}`);
             }
           }
         }
@@ -207,7 +208,10 @@ class JustWatchIngestion {
           offerPlatform = defaultPlatform;
         }
 
-        if (!offerPlatform) continue;
+        if (!offerPlatform) {
+          logger.warn(`Skipping offer for "${movie.title}": could not resolve platform for provider ${offer.providerId}`);
+          continue;
+        }
 
         // Create or update availability
         try {
@@ -224,14 +228,18 @@ class JustWatchIngestion {
         }
       }
 
-      // After processing all offers, update movie with platform summary
-      if (availabilitiesCreated > 0) {
-        try {
-          const platformSummary = await availabilityRepository.buildPlatformSummary(movie._id);
+      // Always rebuild platform summary from existing availability records
+      try {
+        const platformSummary = await availabilityRepository.buildPlatformSummary(movie._id);
+        if (platformSummary.length > 0) {
           await movieRepository.update(movie._id, { platforms: platformSummary });
-        } catch (err) {
-          logger.warn(`Failed to sync platform summary for movie ${movie._id}: ${err.message}`);
         }
+      } catch (err) {
+        logger.warn(`Failed to sync platform summary for movie ${movie._id}: ${err.message}`);
+      }
+
+      if (offers.length > 0 && availabilitiesCreated === 0) {
+        logger.warn(`Movie "${movie.title}" (${movieData.justWatchId}) had ${offers.length} offers but 0 availabilities created`);
       }
 
       return { movie, availabilitiesCreated };

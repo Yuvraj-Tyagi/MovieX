@@ -7,7 +7,8 @@ class PlatformRepository {
    */
   async findByJustWatchId(justWatchId) {
     try {
-      return await Platform.findOne({ justWatchId });
+      if (!justWatchId) return null;
+      return await Platform.findOne({ justWatchId: justWatchId.toString() });
     } catch (error) {
       logger.error('Error finding platform by JustWatch ID:', error);
       throw error;

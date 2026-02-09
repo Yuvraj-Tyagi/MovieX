@@ -66,8 +66,8 @@ class JustWatchClient {
     try {
       logger.debug(`Fetching JustWatch providers for region: ${this.region}`);
       const query = `
-        query GetPackages($country: Country!) {
-          packages(country: $country) {
+        query GetPackages($country: Country!, $platform: Platform!) {
+          packages(country: $country, platform: $platform) {
             id
             packageId
             clearName
@@ -77,7 +77,7 @@ class JustWatchClient {
           }
         }
       `;
-      const variables = { country: this.region };
+      const variables = { country: this.region, platform: 'WEB' };
       const response = await this.request(this.graphqlUrl, 'POST', { query, variables });
       return response.data?.packages || [];
     } catch (error) {
@@ -121,6 +121,8 @@ class JustWatchClient {
                       id
                       packageId
                       clearName
+                      shortName
+                      technicalName
                     }
                     standardWebURL
                   }
@@ -378,7 +380,7 @@ class JustWatchClient {
     if (!jwMovie.offers || jwMovie.offers.length === 0) return [];
     return jwMovie.offers.map(offer => ({
       providerId: offer.package?.packageId?.toString() || offer.package?.id?.toString(),
-      providerName: offer.package?.clearName || null,
+      providerName: offer.package?.clearName || offer.package?.shortName || offer.package?.technicalName || null,
       monetizationType: this.mapMonetizationType(offer.monetizationType),
       quality: this.normalizeQuality(offer.presentationType),
       url: offer.standardWebURL || null
