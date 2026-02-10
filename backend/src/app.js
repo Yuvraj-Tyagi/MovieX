@@ -1,4 +1,5 @@
 const express = require('express');
+const compression = require('compression');
 const movieRoutes = require('./api/routes/movieRoutes');
 const healthRoutes = require('./api/routes/healthRoutes');
 const logger = require('./utils/logger');
@@ -7,6 +8,7 @@ const adminRoutes = require('./api/routes/adminRoutes');
 const app = express();
 
 // Middleware
+app.use(compression());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
