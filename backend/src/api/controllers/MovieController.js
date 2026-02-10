@@ -20,7 +20,7 @@ class MovieController {
 
       const pagination = {
         page: parseInt(req.query.page) || 1,
-        limit: parseInt(req.query.limit) || 20,
+        limit: Math.min(parseInt(req.query.limit) || 20, 100),
         sortBy: req.query.sortBy || 'popularity',
         sortOrder: req.query.sortOrder || 'desc'
       };
@@ -78,7 +78,7 @@ class MovieController {
       
       const pagination = {
         page: parseInt(req.query.page) || 1,
-        limit: parseInt(req.query.limit) || 20,
+        limit: Math.min(parseInt(req.query.limit) || 20, 100),
         sortBy: req.query.sortBy || 'popularity',
         sortOrder: req.query.sortOrder || 'desc'
       };
@@ -123,7 +123,7 @@ class MovieController {
 
       const pagination = {
         page: parseInt(req.query.page) || 1,
-        limit: parseInt(req.query.limit) || 20,
+        limit: Math.min(parseInt(req.query.limit) || 20, 100),
         sortBy: req.query.sortBy || 'popularity',
         sortOrder: req.query.sortOrder || 'desc'
       };
