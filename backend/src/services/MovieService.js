@@ -3,6 +3,7 @@ const availabilityRepository = require('../repositories/AvailabilityRepository')
 const genreRepository = require('../repositories/GenreRepository');
 const platformRepository = require('../repositories/PlatformRepository');
 const logger = require('../utils/logger');
+const { escapeRegex } = require('../utils/apiHelpers');
 
 class MovieService {
   /**
@@ -64,7 +65,7 @@ class MovieService {
       }
 
       if (query) {
-        movieQuery.title = { $regex: query, $options: 'i' };
+        movieQuery.title = { $regex: escapeRegex(query), $options: 'i' };
       }
 
       // If platforms are specified, filter by availability

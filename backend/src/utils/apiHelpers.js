@@ -103,6 +103,13 @@ async function batchProcess(items, processFn, options = {}) {
 }
 
 /**
+ * Escape special regex characters in a string
+ */
+function escapeRegex(str) {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
  * Safe JSON parse
  */
 function safeJsonParse(str, defaultValue = null) {
@@ -119,5 +126,6 @@ module.exports = {
   RateLimiter,
   retryWithBackoff,
   batchProcess,
-  safeJsonParse
+  safeJsonParse,
+  escapeRegex
 };
