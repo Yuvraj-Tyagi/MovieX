@@ -1,6 +1,7 @@
 const express = require('express');
 const compression = require('compression');
 const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 const movieRoutes = require('./api/routes/movieRoutes');
 const healthRoutes = require('./api/routes/healthRoutes');
 const logger = require('./utils/logger');
@@ -19,6 +20,27 @@ app.use((req, res, next) => {
   logger.debug(`${req.method} ${req.path}`);
   next();
 });
+
+// Rate limiting - general API (100 requests per minute per IP)
+const apiLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000,
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, error: 'Too many requests, please try again later' }
+});
+
+// Rate limiting - admin routes (5 requests per 10 minutes per IP)
+const adminLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, error: 'Too many admin requests, please try again later' }
+});
+
+app.use('/api', apiLimiter);
+app.use('/api/admin', adminLimiter);
 
 // CORS (basic setup)
 app.use((req, res, next) => {
