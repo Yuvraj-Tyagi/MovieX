@@ -10,17 +10,15 @@ class MovieController {
       const filters = {
         genres: req.query.genres ? req.query.genres.split(',') : [],
         platforms: req.query.platforms ? req.query.platforms.split(',') : [],
-        releaseYear: req.query.releaseYear ? parseInt(req.query.releaseYear) : null,
-        minRating: req.query.minRating ? parseFloat(req.query.minRating) : null,
-        monetizationTypes: req.query.monetizationTypes 
-          ? req.query.monetizationTypes.split(',') 
-          : ['flatrate', 'free', 'ads'],
+        releaseYear: req.query.releaseYear ?? null,
+        minRating: req.query.minRating ?? null,
+        monetizationTypes: req.query.monetizationTypes || ['flatrate', 'free', 'ads'],
         query: req.query.q || null
       };
 
       const pagination = {
-        page: parseInt(req.query.page) || 1,
-        limit: Math.min(parseInt(req.query.limit) || 20, 100),
+        page: req.query.page || 1,
+        limit: req.query.limit || 20,
         sortBy: req.query.sortBy || 'popularity',
         sortOrder: req.query.sortOrder || 'desc'
       };
@@ -77,8 +75,8 @@ class MovieController {
       const { genreSlug } = req.params;
       
       const pagination = {
-        page: parseInt(req.query.page) || 1,
-        limit: Math.min(parseInt(req.query.limit) || 20, 100),
+        page: req.query.page || 1,
+        limit: req.query.limit || 20,
         sortBy: req.query.sortBy || 'popularity',
         sortOrder: req.query.sortOrder || 'desc'
       };
@@ -115,15 +113,13 @@ class MovieController {
       const { platformSlug } = req.params;
       
       const filters = {
-        minRating: req.query.minRating ? parseFloat(req.query.minRating) : null,
-        monetizationTypes: req.query.monetizationTypes 
-          ? req.query.monetizationTypes.split(',') 
-          : ['flatrate', 'free', 'ads']
+        minRating: req.query.minRating ?? null,
+        monetizationTypes: req.query.monetizationTypes || ['flatrate', 'free', 'ads']
       };
 
       const pagination = {
-        page: parseInt(req.query.page) || 1,
-        limit: Math.min(parseInt(req.query.limit) || 20, 100),
+        page: req.query.page || 1,
+        limit: req.query.limit || 20,
         sortBy: req.query.sortBy || 'popularity',
         sortOrder: req.query.sortOrder || 'desc'
       };
