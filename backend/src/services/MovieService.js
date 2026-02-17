@@ -3,7 +3,6 @@ const availabilityRepository = require('../repositories/AvailabilityRepository')
 const genreRepository = require('../repositories/GenreRepository');
 const platformRepository = require('../repositories/PlatformRepository');
 const logger = require('../utils/logger');
-const { escapeRegex } = require('../utils/apiHelpers');
 
 class MovieService {
   /**
@@ -64,8 +63,10 @@ class MovieService {
         movieQuery.voteAverage = { $gte: minRating };
       }
 
-      if (query) {
-        movieQuery.title = { $regex: escapeRegex(query), $options: 'i' };
+      // Use MongoDB text search for query
+      const isTextSearch = !!query;
+      if (isTextSearch) {
+        movieQuery.$text = { $search: query };
       }
 
       // If platforms are specified, filter by availability
@@ -98,7 +99,8 @@ class MovieService {
             sortBy,
             sortOrder,
             limit,
-            skip
+            skip,
+            textSearch: isTextSearch
           }
         );
       }

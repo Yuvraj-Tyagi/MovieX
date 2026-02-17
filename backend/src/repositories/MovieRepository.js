@@ -134,7 +134,8 @@ class MovieRepository {
         sortBy = 'popularity',
         sortOrder = 'desc',
         limit = 20,
-        skip = 0
+        skip = 0,
+        textSearch = false
       } = options;
 
       const query = { ...filters };
@@ -151,10 +152,24 @@ class MovieRepository {
         query.voteAverage = { $gte: minRating };
       }
 
-      const sort = {};
-      sort[sortBy] = sortOrder === 'desc' ? -1 : 1;
+      // When text search is active and no explicit sort override, sort by relevance
+      const useTextScore = textSearch && sortBy === 'popularity';
 
-      return await Movie.find(query)
+      let sort;
+      if (useTextScore) {
+        sort = { score: { $meta: 'textScore' } };
+      } else {
+        sort = {};
+        sort[sortBy] = sortOrder === 'desc' ? -1 : 1;
+      }
+
+      let dbQuery = Movie.find(query);
+
+      if (textSearch) {
+        dbQuery = dbQuery.select({ score: { $meta: 'textScore' } });
+      }
+
+      return await dbQuery
         .populate('genres')
         .sort(sort)
         .limit(limit)

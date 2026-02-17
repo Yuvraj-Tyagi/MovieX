@@ -23,8 +23,7 @@ const movieSchema = new mongoose.Schema({
   title: {
     type: String,
     required: true,
-    trim: true,
-    index: true
+    trim: true
   },
   originalTitle: {
     type: String,
@@ -166,6 +165,9 @@ const movieSchema = new mongoose.Schema({
 }, {
   timestamps: true
 });
+
+// Text index for search (title weighted 10x over overview)
+movieSchema.index({ title: 'text', overview: 'text' }, { weights: { title: 10, overview: 1 } });
 
 // Compound indexes for common queries
 movieSchema.index({ releaseYear: -1, popularity: -1 });
