@@ -159,6 +159,7 @@ class MovieController {
     try {
       const genres = await movieService.getAllGenres();
 
+      res.set('Cache-Control', 'public, max-age=600'); // 10 min — genres rarely change
       res.json({
         success: true,
         data: genres
@@ -179,6 +180,7 @@ class MovieController {
     try {
       const platforms = await movieService.getAllPlatforms();
 
+      res.set('Cache-Control', 'public, max-age=600'); // 10 min — platforms rarely change
       res.json({
         success: true,
         data: platforms
@@ -199,6 +201,7 @@ class MovieController {
     try {
       const stats = await movieService.getCatalogStatistics();
 
+      res.set('Cache-Control', 'public, max-age=300'); // 5 min — changes with each ingestion run
       res.json({
         success: true,
         data: stats

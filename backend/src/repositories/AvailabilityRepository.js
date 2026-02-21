@@ -218,6 +218,52 @@ class AvailabilityRepository {
   }
 
   /**
+   * Count distinct movies available on specific platforms with filters
+   */
+  async countMoviesOnPlatforms(platformIds, filters = {}) {
+    try {
+      const {
+        monetizationTypes = ['flatrate', 'free', 'ads'],
+        genres,
+        minRating
+      } = filters;
+
+      const pipeline = [
+        {
+          $match: {
+            platform: { $in: platformIds },
+            isAvailable: true,
+            monetizationType: { $in: monetizationTypes }
+          }
+        },
+        {
+          $lookup: {
+            from: 'movies',
+            localField: 'movie',
+            foreignField: '_id',
+            as: 'movieData'
+          }
+        },
+        { $unwind: '$movieData' },
+        {
+          $match: {
+            ...(genres && genres.length > 0 && { 'movieData.genres': { $in: genres } }),
+            ...(minRating && { 'movieData.voteAverage': { $gte: minRating } })
+          }
+        },
+        { $group: { _id: '$movie' } },
+        { $count: 'total' }
+      ];
+
+      const result = await Availability.aggregate(pipeline);
+      return result.length > 0 ? result[0].total : 0;
+    } catch (error) {
+      logger.error('Error counting movies on platforms:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Build platform summary for a movie (denormalized platforms array)
    */
   async buildPlatformSummary(movieId) {

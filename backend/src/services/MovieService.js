@@ -71,6 +71,7 @@ class MovieService {
 
       // If platforms are specified, filter by availability
       let movies;
+      let total;
       if (platforms && platforms.length > 0) {
         // Use availability-based filtering
         const platformDocs = await platformRepository.findAll();
@@ -78,35 +79,39 @@ class MovieService {
           .filter(p => platforms.includes(p.slug) || platforms.includes(p._id.toString()))
           .map(p => p._id);
 
-        const availabilityResults = await availabilityRepository.findMoviesOnPlatforms(
-          platformIds,
-          {
-            monetizationTypes,
-            genres: genres.length > 0 ? genres : undefined,
-            minRating,
-            limit,
-            skip
-          }
-        );
+        const availabilityFilters = {
+          monetizationTypes,
+          genres: genres.length > 0 ? genres : undefined,
+          minRating
+        };
+
+        const [availabilityResults, platformTotal] = await Promise.all([
+          availabilityRepository.findMoviesOnPlatforms(platformIds, { ...availabilityFilters, limit, skip }),
+          availabilityRepository.countMoviesOnPlatforms(platformIds, availabilityFilters)
+        ]);
 
         movies = availabilityResults.map(r => r.movie);
+        total = platformTotal;
       } else {
         // Standard movie search
-        movies = await movieRepository.findByFilters(
-          movieQuery,
-          {
-            genres: genres.length > 0 ? genres : undefined,
-            sortBy,
-            sortOrder,
-            limit,
-            skip,
-            textSearch: isTextSearch
-          }
-        );
-      }
+        const [movieResults, movieTotal] = await Promise.all([
+          movieRepository.findByFilters(
+            movieQuery,
+            {
+              genres: genres.length > 0 ? genres : undefined,
+              sortBy,
+              sortOrder,
+              limit,
+              skip,
+              textSearch: isTextSearch
+            }
+          ),
+          movieRepository.countByFilters(movieQuery)
+        ]);
 
-      // Get total count
-      const total = await movieRepository.countByFilters(movieQuery);
+        movies = movieResults;
+        total = movieTotal;
+      }
 
       return {
         movies,
