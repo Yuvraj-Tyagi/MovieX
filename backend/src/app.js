@@ -39,8 +39,8 @@ const adminLimiter = rateLimit({
   message: { success: false, error: 'Too many admin requests, please try again later' }
 });
 
-app.use('/api', apiLimiter);
-app.use('/api/admin', adminLimiter);
+app.use('/api/v1', apiLimiter);
+app.use('/api/v1/admin', adminLimiter);
 
 // CORS (basic setup)
 app.use((req, res, next) => {
@@ -52,9 +52,9 @@ app.use((req, res, next) => {
 });
 
 // Mount routers at correct paths
-app.use('/api', movieRoutes);   // movieRoutes handles movies, genres, platforms, statistics
-app.use('/api/health', healthRoutes); // health routes
-app.use('/api', adminRoutes); //admin routes
+app.use('/api/v1', movieRoutes);
+app.use('/api/v1/health', healthRoutes);
+app.use('/api/v1', adminRoutes);
 
 // Root endpoint
 app.get('/', (req, res) => {
@@ -63,11 +63,11 @@ app.get('/', (req, res) => {
     message: 'Movie Catalog Ingestion Service',
     version: '1.0.0',
     endpoints: {
-      health: '/api/health',
-      movies: '/api/movies',
-      genres: '/api/genres',
-      platforms: '/api/platforms',
-      statistics: '/api/statistics'
+      health: '/api/v1/health',
+      movies: '/api/v1/movies',
+      genres: '/api/v1/genres',
+      platforms: '/api/v1/platforms',
+      statistics: '/api/v1/statistics'
     }
   });
 });
